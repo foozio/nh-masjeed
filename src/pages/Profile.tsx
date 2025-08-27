@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X } from 'lucide-react';
+import { User, Edit3, Save, X, Mail, Phone, MapPin, Calendar, Shield, Wifi, WifiOff } from 'lucide-react';
 import useAuthStore from '../store/authStore';
+import { toast } from 'sonner';
+import OfflineStatus from '../components/OfflineStatus';
+import CachedDataDisplay from '../components/CachedDataDisplay';
+import OfflineActionButton from '../components/OfflineActionButton';
 
 const Profile: React.FC = () => {
-  const { user, refreshUser } = useAuthStore();
+  const { user, refreshUser, offline } = useAuthStore();
+  const { isOnline, lastSyncTime } = offline;
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -44,7 +49,7 @@ const Profile: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        throw new Error('Gagal memperbarui profil');
       }
 
       const data = await response.json();
@@ -53,7 +58,7 @@ const Profile: React.FC = () => {
         await refreshUser();
         setIsEditing(false);
       } else {
-        throw new Error(data.error || 'Failed to update profile');
+        throw new Error(data.error || 'Gagal memperbarui profil');
       }
     } catch (error) {
       console.error('Profile update error:', error);
@@ -99,16 +104,45 @@ const Profile: React.FC = () => {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Profil Saya
-          </h1>
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Profil Saya
+            </h1>
+            {isOnline ? (
+              <Wifi className="h-6 w-6 text-green-500" />
+            ) : (
+              <WifiOff className="h-6 w-6 text-red-500" />
+            )}
+          </div>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             Kelola informasi profil Anda
           </p>
+          {!isOnline && (
+            <div className="mt-4">
+              <OfflineStatus />
+            </div>
+          )}
         </div>
 
         {/* Profile Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+          {/* Cached Data Indicator */}
+          {!isOnline && user && (
+            <CachedDataDisplay
+              lastUpdated={lastSyncTime}
+              dataType="profile"
+              className="border-b border-gray-200 dark:border-gray-700"
+            >
+              <div className="text-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  Informasi Profil
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Data profil tersimpan
+                </p>
+              </div>
+            </CachedDataDisplay>
+          )}
           {/* Header Section */}
           <div className="bg-gradient-to-r from-green-500 to-blue-600 px-6 py-8">
             <div className="flex items-center space-x-4">
@@ -144,13 +178,38 @@ const Profile: React.FC = () => {
                   </button>
                 ) : (
                   <>
-                    <button
-                      onClick={handleSave}
-                      disabled={isLoading}
-                      className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-full transition-colors duration-200 disabled:opacity-50"
-                    >
-                      <Save className="h-5 w-5" />
-                    </button>
+                    {isOnline ? (
+                      <button
+                        onClick={handleSave}
+                        disabled={isLoading}
+                        className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-full transition-colors duration-200 disabled:opacity-50"
+                      >
+                        <Save className="h-5 w-5" />
+                      </button>
+                    ) : (
+                      <OfflineActionButton
+                        onClick={async () => {
+                          try {
+                            await fetch('/api/profile/update', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${useAuthStore.getState().token}`
+                              },
+                              body: JSON.stringify({ preferences: 'updated' })
+                            });
+                            toast.success('Profil berhasil diperbarui');
+                            setIsEditing(false);
+                            refreshUser();
+                          } catch (error) {
+                            toast.error('Gagal memperbarui profil');
+                          }
+                        }}
+                        className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-full transition-colors duration-200"
+                      >
+                        <Save className="h-5 w-5" />
+                      </OfflineActionButton>
+                    )}
                     <button
                       onClick={handleCancel}
                       className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-full transition-colors duration-200"

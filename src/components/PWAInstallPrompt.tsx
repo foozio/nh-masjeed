@@ -136,17 +136,17 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onInstall, onDismis
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                Install Masjeed App
+                Pasang Aplikasi Masjeed
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Get quick access to prayer times and events
+                Akses cepat ke jadwal sholat dan acara
               </p>
             </div>
           </div>
           <button
             onClick={handleDismiss}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            aria-label="Dismiss install prompt"
+            aria-label="Tutup prompt instalasi"
           >
             <X className="h-4 w-4" />
           </button>
@@ -155,26 +155,26 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onInstall, onDismis
         {isIOS ? (
           <div className="space-y-3">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              To install this app on your iPhone:
+              Untuk memasang aplikasi ini di iPhone Anda:
             </p>
             <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-1 ml-4">
-              <li>1. Tap the Share button in Safari</li>
-              <li>2. Scroll down and tap "Add to Home Screen"</li>
-              <li>3. Tap "Add" to install</li>
+              <li>1. Ketuk tombol Bagikan di Safari</li>
+              <li>2. Gulir ke bawah dan ketuk "Tambah ke Layar Utama"</li>
+              <li>3. Ketuk "Tambah" untuk memasang</li>
             </ol>
             <div className="flex space-x-2">
               <button
                 onClick={handleDismiss}
                 className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
-                Maybe Later
+                Nanti Saja
               </button>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Install the app for faster access and offline features.
+              Pasang aplikasi untuk akses lebih cepat dan fitur offline.
             </p>
             <div className="flex space-x-2">
               <button
@@ -182,13 +182,13 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onInstall, onDismis
                 className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
               >
                 <Download className="h-4 w-4 mr-1" />
-                Install
+                Pasang
               </button>
               <button
                 onClick={handleDismiss}
                 className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
-                Not Now
+                Tidak Sekarang
               </button>
             </div>
           </div>
@@ -197,9 +197,9 @@ const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onInstall, onDismis
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
             <div className="flex space-x-4">
-              <span>✓ Offline access</span>
-              <span>✓ Push notifications</span>
-              <span>✓ Quick launch</span>
+              <span>✓ Akses offline</span>
+              <span>✓ Notifikasi push</span>
+              <span>✓ Peluncuran cepat</span>
             </div>
           </div>
         </div>

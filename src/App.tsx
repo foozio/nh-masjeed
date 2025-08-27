@@ -2,17 +2,19 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
-import AuthSuccess from './pages/AuthSuccess';
 import Profile from './pages/Profile';
+import AuthSuccess from './pages/AuthSuccess';
+import PrayerTimes from './pages/PrayerTimes';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import UpdateNotification from './components/UpdateNotification';
 import OfflineIndicator from './components/OfflineIndicator';
 import useAuthStore from './store/authStore';
+import { setupOfflineQueueListeners } from './utils/offlineQueue';
 
 function App() {
-  const { token, refreshUser } = useAuthStore();
+  const { token, refreshUser, setOnlineStatus, updateQueuedRequests } = useAuthStore();
 
   useEffect(() => {
     // Register service worker
@@ -27,7 +29,35 @@ function App() {
           });
       });
     }
-  }, []);
+
+    // Setup offline queue listeners
+    setupOfflineQueueListeners();
+
+    // Setup network status listeners
+    const handleOnline = () => {
+      console.log('Network back online');
+      setOnlineStatus(true);
+      updateQueuedRequests();
+    };
+
+    const handleOffline = () => {
+      console.log('Network went offline');
+      setOnlineStatus(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial network status
+    setOnlineStatus(navigator.onLine);
+    updateQueuedRequests();
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [setOnlineStatus, updateQueuedRequests]);
 
   // Refresh user data on app load if token exists
   useEffect(() => {
@@ -66,18 +96,7 @@ function App() {
             path="/schedule" 
             element={
               <Layout>
-                <ProtectedRoute>
-                  <div className="min-h-screen flex items-center justify-center">
-                    <div className="text-center">
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                        Jadwal Sholat & Kajian
-                      </h2>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        Fitur ini akan segera hadir
-                      </p>
-                    </div>
-                  </div>
-                </ProtectedRoute>
+                <PrayerTimes />
               </Layout>
             } 
           />

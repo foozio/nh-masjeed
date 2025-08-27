@@ -56,7 +56,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
       offset = 0, 
       category, 
       priority, 
-      is_active = 'true' 
+      is_published = 'true' 
     } = req.query;
 
     let query = supabaseAdmin
@@ -67,23 +67,20 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         content,
         category,
         priority,
-        is_active,
-        is_pinned,
-        scheduled_at,
-        expires_at,
+        is_published,
+        published_at,
         created_at,
         updated_at,
         users!created_by(
           display_name
         )
       `)
-      .order('is_pinned', { ascending: false })
       .order('priority', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Filter by active status
-    if (is_active !== 'all') {
-      query = query.eq('is_active', is_active === 'true');
+    // Filter by published status
+    if (is_published !== 'all') {
+      query = query.eq('is_published', is_published === 'true');
     }
 
     // Filter by category
@@ -96,12 +93,10 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
       query = query.eq('priority', priority);
     }
 
-    // Only show announcements that haven't expired
-    const now = new Date().toISOString();
-    query = query.or(`expires_at.is.null,expires_at.gte.${now}`);
-
-    // Only show announcements that are scheduled to be shown
-    query = query.or(`scheduled_at.is.null,scheduled_at.lte.${now}`);
+    // Only show published announcements for public access
+    if (!req.user || !['Admin', 'Imam', 'Pengurus'].includes(req.user?.role || '')) {
+      query = query.eq('is_published', true);
+    }
 
     query = query.range(Number(offset), Number(offset) + Number(limit) - 1);
 
@@ -138,15 +133,9 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Announcement not found' });
     }
 
-    // Check if announcement is active and not expired
-    const now = new Date();
-    const scheduledAt = announcement.scheduled_at ? new Date(announcement.scheduled_at) : null;
-    const expiresAt = announcement.expires_at ? new Date(announcement.expires_at) : null;
-
-    if (!announcement.is_active || 
-        (scheduledAt && scheduledAt > now) || 
-        (expiresAt && expiresAt < now)) {
-      // Only allow admin/imam/pengurus to view inactive/expired announcements
+    // Check if announcement is published
+    if (!announcement.is_published) {
+      // Only allow admin/imam/pengurus to view unpublished announcements
       if (!req.user || !['Admin', 'Imam', 'Pengurus'].includes(req.user.role)) {
         return res.status(404).json({ success: false, error: 'Announcement not found' });
       }
@@ -166,10 +155,8 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
       title,
       content,
       category = 'General',
-      priority = 'Medium',
-      is_pinned = false,
-      scheduled_at = null,
-      expires_at = null,
+      priority = 'normal',
+      is_published = false,
       send_notification = false
     } = req.body;
 
@@ -191,39 +178,31 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
     }
 
     // Validate priority
-    const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
+    const validPriorities = ['low', 'normal', 'high', 'urgent'];
     if (!validPriorities.includes(priority)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid priority'
+        error: 'Invalid priority. Must be one of: low, normal, high, urgent'
       });
     }
 
-    // Validate dates
-    if (scheduled_at && expires_at) {
-      const scheduledDate = new Date(scheduled_at);
-      const expiresDate = new Date(expires_at);
-      if (scheduledDate >= expiresDate) {
-        return res.status(400).json({
-          success: false,
-          error: 'Expiry date must be after scheduled date'
-        });
-      }
+    const insertData: any = {
+      title: title.trim(),
+      content: content.trim(),
+      category,
+      priority,
+      created_by: req.user?.id,
+      is_published
+    };
+
+    // Set published_at if publishing immediately
+    if (is_published) {
+      insertData.published_at = new Date().toISOString();
     }
 
     const { data: announcement, error } = await supabaseAdmin
       .from('announcements')
-      .insert({
-        title: title.trim(),
-        content: content.trim(),
-        category,
-        priority,
-        is_pinned,
-        scheduled_at,
-        expires_at,
-        created_by: req.user?.id,
-        is_active: true
-      })
+      .insert(insertData)
       .select(`
         *,
         users!created_by(
@@ -236,8 +215,8 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    // Send push notification if requested and announcement is active
-    if (send_notification && (!scheduled_at || new Date(scheduled_at) <= new Date())) {
+    // Send push notification if requested and announcement is published
+    if (send_notification && is_published) {
       await sendPushNotification(
         `📢 ${title}`,
         content.length > 100 ? content.substring(0, 100) + '...' : content
@@ -256,7 +235,7 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
           title,
           category,
           priority,
-          is_pinned,
+          is_published,
           send_notification
         }
       });
@@ -277,10 +256,7 @@ router.put('/:id', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'
       content,
       category,
       priority,
-      is_pinned,
-      is_active,
-      scheduled_at,
-      expires_at,
+      is_published,
       send_notification = false
     } = req.body;
 
@@ -323,43 +299,22 @@ router.put('/:id', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'
     }
 
     if (priority !== undefined) {
-      const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
+      const validPriorities = ['low', 'normal', 'high', 'urgent'];
       if (!validPriorities.includes(priority)) {
-        return res.status(400).json({ success: false, error: 'Invalid priority' });
+        return res.status(400).json({ success: false, error: 'Invalid priority. Must be one of: low, normal, high, urgent' });
       }
       updateData.priority = priority;
     }
 
-    if (is_pinned !== undefined) {
-      updateData.is_pinned = is_pinned;
-    }
-
-    if (is_active !== undefined) {
-      updateData.is_active = is_active;
-    }
-
-    if (scheduled_at !== undefined) {
-      updateData.scheduled_at = scheduled_at;
-    }
-
-    if (expires_at !== undefined) {
-      updateData.expires_at = expires_at;
-    }
-
-    // Validate dates
-    const finalScheduledAt = updateData.scheduled_at ?? existingAnnouncement.scheduled_at;
-    const finalExpiresAt = updateData.expires_at ?? existingAnnouncement.expires_at;
-    
-    if (finalScheduledAt && finalExpiresAt) {
-      const scheduledDate = new Date(finalScheduledAt);
-      const expiresDate = new Date(finalExpiresAt);
-      if (scheduledDate >= expiresDate) {
-        return res.status(400).json({
-          success: false,
-          error: 'Expiry date must be after scheduled date'
-        });
+    if (is_published !== undefined) {
+      updateData.is_published = is_published;
+      // Set published_at when publishing
+      if (is_published && !existingAnnouncement.is_published) {
+        updateData.published_at = new Date().toISOString();
       }
     }
+
+
 
     const { data: announcement, error } = await supabaseAdmin
       .from('announcements')
@@ -377,9 +332,8 @@ router.put('/:id', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    // Send push notification if requested and announcement is active
-    if (send_notification && announcement.is_active && 
-        (!announcement.scheduled_at || new Date(announcement.scheduled_at) <= new Date())) {
+    // Send push notification if requested and announcement is published
+    if (send_notification && announcement.is_published) {
       await sendPushNotification(
         `📢 ${announcement.title}`,
         announcement.content.length > 100 ? 

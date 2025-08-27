@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, Clock, Calendar, Heart, Users, Bell, Wifi, WifiOff } from 'lucide-react';
-import usePWA from '@/hooks/usePWA';
+import usePWA from '../hooks/usePWA';
+import useAuthStore from '../store/authStore';
+import OfflineStatus from '../components/OfflineStatus';
 
 export default function Home() {
   const { isOnline, isInstalled } = usePWA();
+  const { offline } = useAuthStore();
+  const { queuedRequests, lastSyncTime } = offline;
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -14,38 +18,38 @@ export default function Home() {
   const features = [
     {
       icon: Clock,
-      title: 'Prayer Times',
-      description: 'Accurate prayer schedules with notifications',
+      title: 'Jadwal Sholat',
+      description: 'Jadwal sholat akurat dengan notifikasi',
       color: 'text-emerald-600'
     },
     {
       icon: Calendar,
-      title: 'Events',
-      description: 'Kajian, Jumat prayers, and community events',
+      title: 'Acara',
+      description: 'Kajian, sholat Jumat, dan acara komunitas',
       color: 'text-blue-600'
     },
     {
       icon: Heart,
-      title: 'Donations',
-      description: 'Zakat, infaq, and sadaqah with QR codes',
+      title: 'Donasi',
+      description: 'Zakat, infaq, dan sedekah dengan kode QR',
       color: 'text-red-600'
     },
     {
       icon: Users,
-      title: 'Community',
-      description: 'Connect with fellow Muslims and volunteers',
+      title: 'Komunitas',
+      description: 'Terhubung dengan sesama Muslim dan relawan',
       color: 'text-purple-600'
     },
     {
       icon: Bell,
-      title: 'Announcements',
-      description: 'Stay updated with mosque news and updates',
+      title: 'Pengumuman',
+      description: 'Tetap update dengan berita dan info masjid',
       color: 'text-orange-600'
     },
     {
       icon: isOnline ? Wifi : WifiOff,
-      title: 'Offline Ready',
-      description: 'Works without internet connection',
+      title: 'Siap Offline',
+      description: 'Berfungsi tanpa koneksi internet',
       color: isOnline ? 'text-green-600' : 'text-gray-600'
     }
   ];
@@ -90,7 +94,7 @@ export default function Home() {
               Assalamu'alaikum
             </h2>
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8">
-              Welcome to your Islamic Community App
+              Selamat datang di Aplikasi Komunitas Islam Anda
             </p>
           </div>
 
@@ -102,9 +106,9 @@ export default function Home() {
                 : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
             }`}>
               {isInstalled ? (
-                <>✓ App Installed - Ready to use offline!</>
+                <>✓ Aplikasi Terpasang - Siap digunakan offline!</>
               ) : (
-                <>📱 Install this app for the best experience</>
+                <>📱 Pasang aplikasi ini untuk pengalaman terbaik</>
               )}
             </div>
           </div>
@@ -122,11 +126,18 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Offline Status Component */}
+      {!isOnline && (
+        <div className="mb-8">
+          <OfflineStatus />
+        </div>
+      )}
+
       {/* Features Grid */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <h3 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-12">
-            App Features
+            Fitur Aplikasi
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => {
@@ -162,10 +173,10 @@ export default function Home() {
             <span className="text-2xl font-bold">Masjeed</span>
           </div>
           <p className="text-emerald-200 mb-4">
-            Connecting the Muslim community through technology
+            Menghubungkan komunitas Muslim melalui teknologi
           </p>
           <p className="text-sm text-emerald-300">
-            Built with ❤️ for the Ummah • Progressive Web App
+            Dibuat dengan ❤️ untuk Umat • Progressive Web App
           </p>
         </div>
       </footer>

@@ -18,23 +18,17 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         *,
         event_registrations(count)
       `)
-      .eq('is_active', true)
-      .order('event_date', { ascending: true });
+      .order('event_datetime', { ascending: true });
 
     // Filter by event type
     if (type) {
-      query = query.eq('event_type', type);
-    }
-
-    // Filter by status
-    if (status) {
-      query = query.eq('status', status);
+      query = query.eq('type', type);
     }
 
     // Filter upcoming events
     if (upcoming === 'true') {
       const now = new Date().toISOString();
-      query = query.gte('event_date', now);
+      query = query.gte('event_datetime', now);
     }
 
     // Pagination
@@ -96,7 +90,6 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
         )
       `)
       .eq('id', id)
-      .eq('is_active', true)
       .single();
 
     if (error) {
@@ -132,27 +125,24 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
     const {
       title,
       description,
-      event_type,
-      event_date,
+      type,
+      event_datetime,
       location,
-      max_participants,
-      registration_deadline,
-      speaker_info,
-      requirements,
-      contact_info
+      capacity,
+      speaker
     } = req.body;
 
     // Validate required fields
-    if (!title || !event_type || !event_date || !location) {
+    if (!title || !type || !event_datetime || !location) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: title, event_type, event_date, location'
+        error: 'Missing required fields: title, type, event_datetime, location'
       });
     }
 
     // Validate event type
-    const validTypes = ['Kajian', 'Jumat', 'Pengajian', 'Kegiatan Sosial', 'Lainnya'];
-    if (!validTypes.includes(event_type)) {
+    const validTypes = ['kajian', 'jumat', 'pengajian'];
+    if (!validTypes.includes(type)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid event type'
@@ -164,16 +154,12 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
       .insert({
         title: title.trim(),
         description: description?.trim() || null,
-        event_type,
-        event_date,
+        type,
+        event_datetime,
         location: location.trim(),
-        max_participants: max_participants || null,
-        registration_deadline: registration_deadline || null,
-        speaker_info: speaker_info?.trim() || null,
-        requirements: requirements?.trim() || null,
-        contact_info: contact_info?.trim() || null,
-        created_by: req.user?.id,
-        status: 'Scheduled'
+        capacity: capacity || null,
+        speaker: speaker?.trim() || null,
+        created_by: req.user?.id
       })
       .select('*')
       .single();
@@ -190,7 +176,7 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam', 'Pengurus'),
         action: 'CREATE',
         resource_type: 'EVENT',
         resource_id: event.id,
-        details: { title, event_type, event_date }
+        details: { title, type, event_datetime }
       });
 
     res.status(201).json({ success: true, data: event });
@@ -246,38 +232,25 @@ router.post('/:id/register', authenticateToken, async (req: Request, res: Respon
     const { id } = req.params;
     const userId = req.user?.id;
 
-    // Check if event exists and is active
+    // Check if event exists
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
       .select('*')
       .eq('id', id)
-      .eq('is_active', true)
       .single();
 
     if (eventError || !event) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    // Check if registration is still open
-    if (event.registration_deadline) {
-      const deadline = new Date(event.registration_deadline);
-      if (new Date() > deadline) {
-        return res.status(400).json({
-          success: false,
-          error: 'Registration deadline has passed'
-        });
-      }
-    }
-
-    // Check if event is full
-    if (event.max_participants) {
+    // Check if event is full (if capacity is set)
+    if (event.capacity) {
       const { count } = await supabaseAdmin
         .from('event_registrations')
         .select('*', { count: 'exact', head: true })
-        .eq('event_id', id)
-        .eq('status', 'Confirmed');
+        .eq('event_id', id);
 
-      if (count && count >= event.max_participants) {
+      if (count && count >= event.capacity) {
         return res.status(400).json({
           success: false,
           error: 'Event is full'
@@ -305,8 +278,7 @@ router.post('/:id/register', authenticateToken, async (req: Request, res: Respon
       .from('event_registrations')
       .insert({
         event_id: id,
-        user_id: userId,
-        status: 'Confirmed'
+        user_id: userId
       })
       .select('*')
       .single();

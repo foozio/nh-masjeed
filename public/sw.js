@@ -70,14 +70,31 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
+  // Handle API requests (including auth endpoints)
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      handleApiRequest(request).catch(error => {
+        // For auth endpoints, return the actual network error response
+        if (url.pathname.startsWith('/api/auth/')) {
+          console.log('Auth endpoint failed, returning network error:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Authentication service unavailable',
+            offline: false
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        // For other API endpoints, re-throw the error
+        throw error;
+      })
+    );
     return;
   }
 
-  // Handle API requests
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(handleApiRequest(request));
+  // Skip non-GET requests for non-API endpoints
+  if (request.method !== 'GET') {
     return;
   }
 
@@ -117,8 +134,59 @@ async function handleStaticAssets(request) {
   }
 }
 
-// Network-first strategy for API requests with fallback to cache
+// Enhanced API request handling with IndexedDB fallback
 async function handleApiRequest(request) {
+  const url = new URL(request.url);
+  const isWriteOperation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
+  const isAuthEndpoint = url.pathname.startsWith('/api/auth/');
+  
+  // For auth endpoints, always try network first and let actual errors propagate
+  if (isAuthEndpoint) {
+    try {
+      const networkResponse = await fetch(request);
+      return networkResponse;
+    } catch (error) {
+      console.log('Auth endpoint network request failed:', error);
+      // Let the actual network error propagate for auth endpoints
+      // Don't return offline response for auth endpoints
+      throw error;
+    }
+  }
+  
+  // Handle write operations when offline
+  if (isWriteOperation) {
+    try {
+      const networkResponse = await fetch(request);
+      if (networkResponse.ok) {
+        return networkResponse;
+      }
+      throw new Error('Network response not ok');
+    } catch (error) {
+      console.log('Write operation failed, adding to offline queue:', error);
+      
+      // Add to offline queue for later sync
+      const requestBody = request.method !== 'DELETE' ? await request.clone().text() : null;
+      await addToOfflineQueue({
+        type: getRequestType(url.pathname),
+        url: request.url,
+        method: request.method,
+        body: requestBody,
+        headers: Object.fromEntries(request.headers.entries())
+      });
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Request queued for when back online',
+        offline: true,
+        queued: true
+      }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  
+  // Handle read operations with enhanced caching
   try {
     const networkResponse = await fetch(request);
     
@@ -126,35 +194,189 @@ async function handleApiRequest(request) {
       // Cache successful API responses
       const cache = await caches.open(API_CACHE_NAME);
       cache.put(request, networkResponse.clone());
+      
+      // Also store in IndexedDB for better offline access
+      const responseData = await networkResponse.clone().json();
+      await storeApiDataInIndexedDB(url.pathname, responseData);
+      
       return networkResponse;
     }
     
     throw new Error('Network response not ok');
   } catch (error) {
-    console.log('API network request failed, trying cache:', error);
+    console.log('API network request failed, trying fallbacks:', error);
     
+    // Try cache first
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
-      // Add a header to indicate this is from cache
       const response = cachedResponse.clone();
       response.headers.set('X-From-Cache', 'true');
       return response;
     }
     
-    // Return offline response for critical endpoints
-    if (request.url.includes('/api/prayers/today')) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Prayer times not available offline',
-        offline: true
-      }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' }
+    // Try IndexedDB as final fallback
+    const indexedDBData = await getApiDataFromIndexedDB(url.pathname);
+    if (indexedDBData) {
+      return new Response(JSON.stringify(indexedDBData.data), {
+        status: 200,
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-From-IndexedDB': 'true'
+        }
       });
     }
     
-    return new Response('API not available offline', { status: 503 });
+    // Return appropriate offline response
+    return getOfflineResponse(url.pathname);
   }
+}
+
+// Helper function to determine request type for offline queue
+function getRequestType(pathname) {
+  if (pathname.includes('/donations')) return 'donations';
+  if (pathname.includes('/events') && pathname.includes('/register')) return 'registrations';
+  if (pathname.includes('/announcements')) return 'announcements';
+  return 'general';
+}
+
+// Store API data in IndexedDB
+async function storeApiDataInIndexedDB(pathname, data) {
+  try {
+    const db = await openIndexedDB();
+    let storeName = 'general';
+    let id = 'current';
+    
+    if (pathname.includes('/prayers')) {
+      storeName = 'prayerTimes';
+    } else if (pathname.includes('/events')) {
+      storeName = 'events';
+    } else if (pathname.includes('/announcements')) {
+      storeName = 'announcements';
+    }
+    
+    if (db.objectStoreNames.contains(storeName)) {
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      
+      const storeData = {
+        id,
+        data,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour TTL
+      };
+      
+      store.put(storeData);
+    }
+  } catch (error) {
+    console.error('Error storing API data in IndexedDB:', error);
+  }
+}
+
+// Get API data from IndexedDB
+async function getApiDataFromIndexedDB(pathname) {
+  try {
+    const db = await openIndexedDB();
+    let storeName = 'general';
+    
+    if (pathname.includes('/prayers')) {
+      storeName = 'prayerTimes';
+    } else if (pathname.includes('/events')) {
+      storeName = 'events';
+    } else if (pathname.includes('/announcements')) {
+      storeName = 'announcements';
+    }
+    
+    if (!db.objectStoreNames.contains(storeName)) {
+      return null;
+    }
+    
+    const transaction = db.transaction([storeName], 'readonly');
+    const store = transaction.objectStore(storeName);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.get('current');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const result = request.result;
+        if (!result) {
+          resolve(null);
+          return;
+        }
+        
+        // Check if data has expired
+        if (result.expiresAt && Date.now() > result.expiresAt) {
+          resolve(null);
+          return;
+        }
+        
+        resolve(result);
+      };
+    });
+  } catch (error) {
+    console.error('Error getting API data from IndexedDB:', error);
+    return null;
+  }
+}
+
+// Get appropriate offline response based on endpoint
+function getOfflineResponse(pathname) {
+  // Never return offline response for auth endpoints
+  if (pathname.startsWith('/api/auth/')) {
+    // This should not be called for auth endpoints, but if it is,
+    // return a proper error response
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Authentication service unavailable'
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  if (pathname.includes('/prayers')) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Prayer times not available offline',
+      offline: true,
+      data: null
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  if (pathname.includes('/events')) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Events not available offline',
+      offline: true,
+      data: []
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  if (pathname.includes('/announcements')) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Announcements not available offline',
+      offline: true,
+      data: []
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  return new Response(JSON.stringify({
+    success: false,
+    error: 'API not available offline',
+    offline: true
+  }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 // Network-first strategy for navigation with offline fallback
@@ -339,16 +561,94 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Helper functions for offline data management
+// IndexedDB helper functions for offline data management
+async function openIndexedDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('masjeed-offline-db', 1);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      
+      if (!db.objectStoreNames.contains('offlineQueue')) {
+        db.createObjectStore('offlineQueue', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('prayerTimes')) {
+        db.createObjectStore('prayerTimes', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('events')) {
+        db.createObjectStore('events', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('announcements')) {
+        db.createObjectStore('announcements', { keyPath: 'id' });
+      }
+    };
+  });
+}
+
 async function getOfflineData(type) {
-  // This would typically use IndexedDB
-  // For now, return empty array
-  return [];
+  try {
+    const db = await openIndexedDB();
+    const transaction = db.transaction(['offlineQueue'], 'readonly');
+    const store = transaction.objectStore('offlineQueue');
+    const request = store.getAll();
+    
+    return new Promise((resolve, reject) => {
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const allData = request.result || [];
+        const filteredData = allData.filter(item => item.type === type);
+        resolve(filteredData);
+      };
+    });
+  } catch (error) {
+    console.error('Error getting offline data:', error);
+    return [];
+  }
 }
 
 async function removeOfflineData(type, id) {
-  // This would typically remove from IndexedDB
-  console.log(`Removing offline ${type} data:`, id);
+  try {
+    const db = await openIndexedDB();
+    const transaction = db.transaction(['offlineQueue'], 'readwrite');
+    const store = transaction.objectStore('offlineQueue');
+    
+    return new Promise((resolve, reject) => {
+      const request = store.delete(id);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        console.log(`Removed offline ${type} data:`, id);
+        resolve();
+      };
+    });
+  } catch (error) {
+    console.error('Error removing offline data:', error);
+  }
+}
+
+async function addToOfflineQueue(data) {
+  try {
+    const db = await openIndexedDB();
+    const transaction = db.transaction(['offlineQueue'], 'readwrite');
+    const store = transaction.objectStore('offlineQueue');
+    
+    const queueItem = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...data,
+      timestamp: Date.now(),
+      retryCount: 0
+    };
+    
+    return new Promise((resolve, reject) => {
+      const request = store.add(queueItem);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(queueItem.id);
+    });
+  } catch (error) {
+    console.error('Error adding to offline queue:', error);
+  }
 }
 
 // Message handling from main thread

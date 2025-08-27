@@ -14,7 +14,6 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     let query = supabaseAdmin
       .from('prayer_schedules')
       .select('*')
-      .eq('is_active', true)
       .order('prayer_date', { ascending: true });
 
     // Filter by specific date
@@ -57,7 +56,6 @@ router.get('/today', optionalAuth, async (req: Request, res: Response) => {
       .from('prayer_schedules')
       .select('*')
       .eq('prayer_date', today)
-      .eq('is_active', true)
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -76,17 +74,16 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam'), async (req:
   try {
     const {
       prayer_date,
-      fajr_time,
-      sunrise_time,
-      dhuhr_time,
-      asr_time,
-      maghrib_time,
-      isha_time,
-      notes
+      fajr,
+      dhuhr,
+      asr,
+      maghrib,
+      isha,
+      hijri_date
     } = req.body;
 
     // Validate required fields
-    if (!prayer_date || !fajr_time || !dhuhr_time || !asr_time || !maghrib_time || !isha_time) {
+    if (!prayer_date || !fajr || !dhuhr || !asr || !maghrib || !isha) {
       return res.status(400).json({
         success: false,
         error: 'Missing required prayer times'
@@ -111,14 +108,13 @@ router.post('/', authenticateToken, authorizeRoles('Admin', 'Imam'), async (req:
       .from('prayer_schedules')
       .insert({
         prayer_date,
-        fajr_time,
-        sunrise_time,
-        dhuhr_time,
-        asr_time,
-        maghrib_time,
-        isha_time,
-        notes: notes?.trim() || null,
-        created_by: req.user?.id
+        fajr,
+        dhuhr,
+        asr,
+        maghrib,
+        isha,
+        hijri_date: hijri_date?.trim() || null,
+        updated_by: req.user?.id
       })
       .select('*')
       .single();
@@ -150,27 +146,24 @@ router.put('/:id', authenticateToken, authorizeRoles('Admin', 'Imam'), async (re
   try {
     const { id } = req.params;
     const {
-      fajr_time,
-      sunrise_time,
-      dhuhr_time,
-      asr_time,
-      maghrib_time,
-      isha_time,
-      notes,
-      is_active
+      fajr,
+      dhuhr,
+      asr,
+      maghrib,
+      isha,
+      hijri_date
     } = req.body;
 
     const { data: schedule, error } = await supabaseAdmin
       .from('prayer_schedules')
       .update({
-        fajr_time,
-        sunrise_time,
-        dhuhr_time,
-        asr_time,
-        maghrib_time,
-        isha_time,
-        notes: notes?.trim() || null,
-        is_active,
+        fajr,
+        dhuhr,
+        asr,
+        maghrib,
+        isha,
+        hijri_date: hijri_date?.trim() || null,
+        updated_by: req.user?.id,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

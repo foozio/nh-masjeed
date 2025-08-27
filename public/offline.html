@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Offline - Masjeed App</title>
+    <title>Offline - Aplikasi Masjeed</title>
     <style>
         * {
             margin: 0;
@@ -166,33 +166,33 @@
             📡
         </div>
         
-        <h1 class="offline-title">You're Offline</h1>
+        <h1 class="offline-title">Anda Sedang Offline</h1>
         
         <p class="offline-message">
-            It looks like you're not connected to the internet. Don't worry, you can still access some features of the Masjeed app while offline.
+            Sepertinya Anda tidak terhubung ke internet. Jangan khawatir, Anda masih dapat mengakses beberapa fitur aplikasi Masjeed saat offline.
         </p>
         
         <div class="offline-actions">
             <button class="btn btn-primary" onclick="tryReconnect()">
-                Try Again
+                Coba Lagi
             </button>
             <a href="/" class="btn btn-secondary">
-                Go to Home
+                Ke Beranda
             </a>
         </div>
         
         <div class="connection-status status-offline" id="connectionStatus">
-            🔴 No internet connection
+            🔴 Tidak ada koneksi internet
         </div>
         
         <div class="offline-features">
-            <h3 class="features-title">Available Offline:</h3>
+            <h3 class="features-title">Tersedia Offline:</h3>
             <ul class="features-list">
-                <li>View cached prayer times</li>
-                <li>Browse saved events</li>
-                <li>Read downloaded announcements</li>
-                <li>Access community directory</li>
-                <li>View donation history</li>
+                <li>Lihat jadwal sholat tersimpan</li>
+                <li>Jelajahi acara tersimpan</li>
+                <li>Baca pengumuman terunduh</li>
+                <li>Akses direktori komunitas</li>
+                <li>Lihat riwayat donasi</li>
             </ul>
         </div>
     </div>
@@ -203,7 +203,7 @@
             const statusElement = document.getElementById('connectionStatus');
             
             if (navigator.onLine) {
-                statusElement.textContent = '🟢 Back online!';
+                statusElement.textContent = '🟢 Kembali online!';
                 statusElement.className = 'connection-status status-online';
                 
                 // Auto-redirect after 2 seconds when back online
@@ -211,7 +211,7 @@
                     window.location.reload();
                 }, 2000);
             } else {
-                statusElement.textContent = '🔴 No internet connection';
+                statusElement.textContent = '🔴 Tidak ada koneksi internet';
                 statusElement.className = 'connection-status status-offline';
             }
         }
@@ -226,7 +226,7 @@
                 // Show feedback that we're still offline
                 const button = document.querySelector('.btn-primary');
                 const originalText = button.textContent;
-                button.textContent = 'Still offline...';
+                button.textContent = 'Masih offline...';
                 button.disabled = true;
                 
                 setTimeout(() => {

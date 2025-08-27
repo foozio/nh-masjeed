@@ -1,102 +1,54 @@
 {
-  "name": "Masjeed PWA - Islamic Community Management",
+  "name": "Masjeed PWA - Manajemen Komunitas Islam",
   "short_name": "Masjeed",
-  "description": "Progressive Web App for Islamic community management with prayer schedules, events, donations, and community features",
+  "description": "Aplikasi Web Progresif untuk manajemen komunitas Islam dengan jadwal sholat, acara, donasi, dan fitur komunitas",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#059669",
   "orientation": "portrait-primary",
   "scope": "/",
-  "lang": "en",
+  "lang": "id",
   "dir": "ltr",
   "categories": ["lifestyle", "social", "utilities"],
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "maskable any"
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icons/icon.svg",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable any"
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     },
     {
-      "src": "/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icons/icon.svg",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable any"
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
     {
-      "name": "Prayer Times",
-      "short_name": "Prayers",
-      "description": "View today's prayer schedule",
-      "url": "/prayers",
-      "icons": [
-        {
-          "src": "/icons/prayer-icon.png",
-          "sizes": "96x96"
-        }
-      ]
+      "name": "Jadwal Sholat",
+      "short_name": "Sholat",
+      "description": "Lihat jadwal sholat hari ini",
+      "url": "/prayers"
     },
     {
-      "name": "Events",
-      "short_name": "Events",
-      "description": "Browse upcoming events",
-      "url": "/events",
-      "icons": [
-        {
-          "src": "/icons/event-icon.png",
-          "sizes": "96x96"
-        }
-      ]
+      "name": "Acara",
+      "short_name": "Acara",
+      "description": "Jelajahi acara mendatang",
+      "url": "/events"
     },
     {
-      "name": "Donations",
-      "short_name": "Donate",
-      "description": "Make a donation or zakat",
-      "url": "/donations",
-      "icons": [
-        {
-          "src": "/icons/donate-icon.png",
-          "sizes": "96x96"
-        }
-      ]
+      "name": "Donasi",
+      "short_name": "Donasi",
+      "description": "Berikan donasi atau zakat",
+      "url": "/donations"
     }
   ],
   "related_applications": [],

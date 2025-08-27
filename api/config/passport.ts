@@ -10,7 +10,7 @@ dotenv.config();
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5173/auth/callback';
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/api/auth/google/callback';
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
   throw new Error('Missing Google OAuth environment variables');
@@ -41,7 +41,8 @@ passport.deserializeUser(async (id: string, done) => {
       .single();
 
     if (error || !user) {
-      return done(error, null);
+      console.error('Deserialize user error:', error);
+      return done(null, null); // Don't pass error to avoid crashes
     }
 
     done(null, {
@@ -52,7 +53,8 @@ passport.deserializeUser(async (id: string, done) => {
       role: user.user_roles[0]?.role_name || 'Jamaah'
     });
   } catch (error) {
-    done(error, null);
+    console.error('Deserialize user exception:', error);
+    done(null, null); // Don't pass error to avoid crashes
   }
 });
 
@@ -76,7 +78,7 @@ passport.use(
         }
 
         // Check if user already exists
-        const { data: existingUser } = await supabaseAdmin
+        const { data: existingUser, error: fetchError } = await supabaseAdmin
           .from('users')
           .select(`
             id,
@@ -92,65 +94,94 @@ passport.use(
           .eq('is_active', true)
           .single();
 
-        if (existingUser) {
-          // Update existing user's Google ID and avatar if needed
-          await supabaseAdmin
-            .from('users')
-            .update({
-              google_id: googleId,
-              avatar_url: avatarUrl,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingUser.id);
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Error fetching existing user:', fetchError);
+          return done(null, null); // Don't pass error to avoid crashes
+        }
 
-          return done(null, {
-            id: existingUser.id,
-            email: existingUser.email,
-            display_name: existingUser.display_name,
-            avatar_url: avatarUrl,
-            role: existingUser.user_roles[0]?.role_name || 'Jamaah'
-          });
+        if (existingUser) {
+          try {
+            // Update existing user's Google ID and avatar if needed
+            await supabaseAdmin
+              .from('users')
+              .update({
+                google_id: googleId,
+                avatar_url: avatarUrl,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingUser.id);
+
+            return done(null, {
+              id: existingUser.id,
+              email: existingUser.email,
+              display_name: existingUser.display_name,
+              avatar_url: avatarUrl,
+              role: existingUser.user_roles[0]?.role_name || 'Jamaah'
+            });
+          } catch (updateError) {
+            console.error('Error updating existing user:', updateError);
+            // Still return the user even if update fails
+            return done(null, {
+              id: existingUser.id,
+              email: existingUser.email,
+              display_name: existingUser.display_name,
+              avatar_url: existingUser.avatar_url,
+              role: existingUser.user_roles[0]?.role_name || 'Jamaah'
+            });
+          }
         }
 
         // Create new user
-        const { data: newUser, error: createError } = await supabaseAdmin
-          .from('users')
-          .insert({
-            email,
-            google_id: googleId,
-            display_name: displayName,
-            avatar_url: avatarUrl,
-            profile_data: {
-              provider: 'google',
-              first_login: new Date().toISOString()
-            }
-          })
-          .select('id, email, display_name, avatar_url')
-          .single();
+        try {
+          const { data: newUser, error: createError } = await supabaseAdmin
+            .from('users')
+            .insert({
+              email,
+              google_id: googleId,
+              display_name: displayName,
+              avatar_url: avatarUrl,
+              profile_data: {
+                provider: 'google',
+                first_login: new Date().toISOString()
+              }
+            })
+            .select('id, email, display_name, avatar_url')
+            .single();
 
-        if (createError || !newUser) {
-          return done(createError || new Error('Failed to create user'), null);
-        }
+          if (createError || !newUser) {
+            console.error('Error creating new user:', createError);
+            return done(null, null); // Don't pass error to avoid crashes
+          }
 
-        // Assign default role (Jamaah)
-        await supabaseAdmin
-          .from('user_roles')
-          .insert({
-            user_id: newUser.id,
-            role_name: 'Jamaah',
-            assigned_by: newUser.id // Self-assigned for new users
+          // Assign default role (Jamaah)
+          try {
+            await supabaseAdmin
+              .from('user_roles')
+              .insert({
+                user_id: newUser.id,
+                role_name: 'Jamaah',
+                assigned_by: newUser.id // Self-assigned for new users
+              });
+          } catch (roleError) {
+            console.error('Error assigning role to new user:', roleError);
+            // Continue even if role assignment fails
+          }
+
+          return done(null, {
+            id: newUser.id,
+            email: newUser.email,
+            display_name: newUser.display_name,
+            avatar_url: newUser.avatar_url,
+            role: 'Jamaah'
           });
-
-        return done(null, {
-          id: newUser.id,
-          email: newUser.email,
-          display_name: newUser.display_name,
-          avatar_url: newUser.avatar_url,
-          role: 'Jamaah'
-        });
+        } catch (userCreationError) {
+          console.error('Exception during user creation:', userCreationError);
+          return done(null, null); // Don't pass error to avoid crashes
+        }
       } catch (error) {
-        return done(error, null);
-      }
+         console.error('Google OAuth strategy error:', error);
+         return done(null, null); // Don't pass error to avoid crashes
+       }
     }
   )
 );

@@ -69,7 +69,7 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
         )}
         
         <span>
-          {isOnline ? 'Back Online' : 'Offline'}
+          {isOnline ? 'Kembali Online' : 'Offline'}
         </span>
         
         {!isOnline && offlineDuration && (
@@ -86,37 +86,37 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
             <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="font-medium text-orange-900 dark:text-orange-100 text-sm mb-2">
-                You're currently offline
+                Anda sedang offline
               </h3>
               
               <div className="space-y-3">
                 <p className="text-xs text-orange-700 dark:text-orange-300">
-                  Some features may be limited, but you can still access:
+                  Beberapa fitur mungkin terbatas, tetapi Anda masih dapat mengakses:
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="flex items-center space-x-2 text-xs text-orange-700 dark:text-orange-300">
                     <Clock className="h-3 w-3" />
-                    <span>Cached prayer times</span>
+                    <span>Jadwal sholat tersimpan</span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-orange-700 dark:text-orange-300">
                     <Clock className="h-3 w-3" />
-                    <span>Saved events</span>
+                    <span>Acara tersimpan</span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-orange-700 dark:text-orange-300">
                     <Clock className="h-3 w-3" />
-                    <span>Downloaded announcements</span>
+                    <span>Pengumuman terunduh</span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-orange-700 dark:text-orange-300">
                     <Clock className="h-3 w-3" />
-                    <span>Community directory</span>
+                    <span>Direktori komunitas</span>
                   </div>
                 </div>
                 
                 <div className="bg-orange-100 dark:bg-orange-900/20 rounded-md p-2 mt-3">
                   <p className="text-xs text-orange-800 dark:text-orange-200">
-                    <strong>Note:</strong> Any actions you take (like donations or event registrations) 
-                    will be saved and synced automatically when you're back online.
+                    <strong>Catatan:</strong> Setiap tindakan yang Anda lakukan (seperti donasi atau pendaftaran acara) 
+                    akan disimpan dan disinkronkan secara otomatis ketika Anda kembali online.
                   </p>
                 </div>
               </div>

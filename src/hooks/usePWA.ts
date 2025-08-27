@@ -34,48 +34,7 @@ const usePWA = (): UsePWAReturn => {
     offlineQueue: [],
   });
 
-  // Check if app is installed (running in standalone mode)
-  const checkIfInstalled = useCallback(() => {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    const isIOSStandalone = (window.navigator as any).standalone === true;
-    return isStandalone || isIOSStandalone;
-  }, []);
 
-  // Register service worker
-  const registerServiceWorker = useCallback(async () => {
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        
-        setState(prev => ({ ...prev, swRegistration: registration }));
-
-        // Check for updates
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setState(prev => ({ ...prev, isUpdateAvailable: true }));
-              }
-            });
-          }
-        });
-
-        // Listen for messages from service worker
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data && event.data.type === 'SW_UPDATE_AVAILABLE') {
-            setState(prev => ({ ...prev, isUpdateAvailable: true }));
-          }
-        });
-
-        return registration;
-      } catch (error) {
-        console.error('Service worker registration failed:', error);
-        return null;
-      }
-    }
-    return null;
-  }, []);
 
   // Update app when new version is available
   const updateApp = useCallback(async () => {
@@ -198,10 +157,44 @@ const usePWA = (): UsePWAReturn => {
   // Initialize PWA features
   useEffect(() => {
     // Check if installed
-    setState(prev => ({ ...prev, isInstalled: checkIfInstalled() }));
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = (window.navigator as any).standalone === true;
+    const isInstalled = isStandalone || isIOSStandalone;
+    setState(prev => ({ ...prev, isInstalled }));
 
     // Register service worker
-    registerServiceWorker();
+    const initServiceWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          
+          setState(prev => ({ ...prev, swRegistration: registration }));
+
+          // Check for updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  setState(prev => ({ ...prev, isUpdateAvailable: true }));
+                }
+              });
+            }
+          });
+
+          // Listen for messages from service worker
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'SW_UPDATE_AVAILABLE') {
+              setState(prev => ({ ...prev, isUpdateAvailable: true }));
+            }
+          });
+        } catch (error) {
+          console.error('Service worker registration failed:', error);
+        }
+      }
+    };
+
+    initServiceWorker();
 
     // Listen for online/offline events
     const handleOnline = () => setState(prev => ({ ...prev, isOnline: true }));
@@ -235,7 +228,7 @@ const usePWA = (): UsePWAReturn => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [checkIfInstalled, registerServiceWorker]);
+  }, []);
 
   return {
     ...state,

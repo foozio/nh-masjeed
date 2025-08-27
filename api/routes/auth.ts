@@ -14,38 +14,48 @@ router.get('/google',
 
 // Google OAuth callback
 router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
+  passport.authenticate('google', { 
+    failureRedirect: `${process.env.APP_URL || 'http://localhost:5173'}/login?error=auth_failed` 
+  }),
   async (req: Request, res: Response) => {
     try {
       const user = req.user as any;
       
       if (!user) {
-        return res.redirect('/login?error=no_user');
+        console.log('No user found in callback');
+        const frontendUrl = process.env.APP_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/login?error=no_user`);
       }
 
       // Generate JWT token
       const token = generateToken({ userId: user.id, email: user.email });
       
-      // Log successful login
-      await supabaseAdmin
-        .from('audit_logs')
-        .insert({
-          user_id: user.id,
-          action: 'LOGIN',
-          resource_type: 'AUTH',
-          details: {
-            method: 'google_oauth',
-            ip: req.ip,
-            user_agent: req.get('User-Agent')
-          }
-        });
+      // Log successful login (don't let this fail the auth)
+      try {
+        await supabaseAdmin
+          .from('audit_logs')
+          .insert({
+            user_id: user.id,
+            action: 'LOGIN',
+            resource_type: 'AUTH',
+            details: {
+              method: 'google_oauth',
+              ip: req.ip,
+              user_agent: req.get('User-Agent')
+            }
+          });
+      } catch (logError) {
+        console.error('Failed to log auth event:', logError);
+        // Continue with auth even if logging fails
+      }
 
       // Redirect to frontend with token
       const frontendUrl = process.env.APP_URL || 'http://localhost:5173';
       res.redirect(`${frontendUrl}/auth/success?token=${token}`);
     } catch (error) {
       console.error('Auth callback error:', error);
-      res.redirect('/login?error=callback_failed');
+      const frontendUrl = process.env.APP_URL || 'http://localhost:5173';
+      res.redirect(`${frontendUrl}/login?error=callback_failed`);
     }
   }
 );

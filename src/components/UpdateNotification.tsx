@@ -51,12 +51,12 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate, onDis
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">
-                {isUpdating ? 'Updating App...' : 'Update Available'}
+                {isUpdating ? 'Memperbarui Aplikasi...' : 'Pembaruan Tersedia'}
               </h3>
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
                 {isUpdating 
-                  ? 'Please wait while we update the app'
-                  : 'A new version of Masjeed app is ready to install'
+                  ? 'Mohon tunggu sementara kami memperbarui aplikasi'
+                  : 'Versi baru aplikasi Masjeed siap untuk dipasang'
                 }
               </p>
             </div>
@@ -66,7 +66,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate, onDis
             <button
               onClick={handleDismiss}
               className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors ml-2"
-              aria-label="Dismiss update notification"
+              aria-label="Tutup notifikasi pembaruan"
             >
               <X className="h-4 w-4" />
             </button>
@@ -78,13 +78,13 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate, onDis
             {showDetails && (
               <div className="bg-blue-100 dark:bg-blue-900/40 rounded-md p-3">
                 <h4 className="font-medium text-blue-900 dark:text-blue-100 text-xs mb-2">
-                  What's New:
+                  Yang Baru:
                 </h4>
                 <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>• Performance improvements</li>
-                  <li>• Bug fixes and stability enhancements</li>
-                  <li>• Updated prayer time calculations</li>
-                  <li>• Enhanced offline functionality</li>
+                  <li>• Peningkatan performa</li>
+                  <li>• Perbaikan bug dan peningkatan stabilitas</li>
+                  <li>• Pembaruan perhitungan waktu sholat</li>
+                  <li>• Peningkatan fungsi offline</li>
                 </ul>
               </div>
             )}
@@ -94,7 +94,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate, onDis
                 onClick={() => setShowDetails(!showDetails)}
                 className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
               >
-                {showDetails ? 'Hide Details' : 'What\'s New?'}
+                {showDetails ? 'Sembunyikan Detail' : 'Apa yang Baru?'}
               </button>
               
               <div className="flex space-x-2">
@@ -102,14 +102,14 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate, onDis
                   onClick={handleDismiss}
                   className="px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
                 >
-                  Later
+                  Nanti
                 </button>
                 <button
                   onClick={handleUpdate}
                   className="flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
                 >
                   <Download className="h-3 w-3 mr-1" />
-                  Update Now
+                  Perbarui Sekarang
                 </button>
               </div>
             </div>
@@ -120,8 +120,8 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate, onDis
           <div className="mt-4">
             <div className="bg-blue-100 dark:bg-blue-900/40 rounded-md p-3">
               <div className="flex items-center justify-between text-xs text-blue-700 dark:text-blue-300 mb-2">
-                <span>Updating...</span>
-                <span>Please don't close the app</span>
+                <span>Memperbarui...</span>
+                <span>Jangan tutup aplikasi</span>
               </div>
               <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5">
                 <div className="bg-blue-600 dark:bg-blue-400 h-1.5 rounded-full animate-pulse" style={{ width: '70%' }}></div>

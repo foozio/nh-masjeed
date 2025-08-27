@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { offlineQueue, setupOfflineQueueListeners } from '../utils/offlineQueue';
+import { indexedDBManager } from '../utils/indexedDB';
 
 interface User {
   id: string;
@@ -12,12 +14,20 @@ interface User {
   created_at: string;
 }
 
+interface OfflineState {
+  isOnline: boolean;
+  queuedRequests: number;
+  lastSyncTime: number | null;
+  syncInProgress: boolean;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  offline: OfflineState;
 }
 
 interface AuthActions {
@@ -29,6 +39,12 @@ interface AuthActions {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   clearError: () => void;
+  // Offline actions
+  setOnlineStatus: (isOnline: boolean) => void;
+  updateQueuedRequests: () => Promise<void>;
+  syncOfflineData: () => Promise<void>;
+  clearOfflineQueue: () => Promise<void>;
+  getOfflineStatus: () => OfflineState;
 }
 
 type AuthStore = AuthState & AuthActions;
@@ -42,6 +58,12 @@ const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      offline: {
+        isOnline: navigator.onLine,
+        queuedRequests: 0,
+        lastSyncTime: null,
+        syncInProgress: false
+      },
 
       // Actions
       setUser: (user: User) => {
@@ -135,13 +157,29 @@ const useAuthStore = create<AuthStore>()(
 
       refreshUser: async () => {
         try {
-          const { token } = get();
+          const { token, offline } = get();
           
           if (!token) {
             return;
           }
 
           set({ isLoading: true });
+          
+          // If offline, try to get cached user data
+          if (!offline.isOnline) {
+            try {
+              const cachedUser = await indexedDBManager.get('userData', 'currentUser');
+            if (cachedUser && cachedUser.data && typeof cachedUser.data === 'object' && 'email' in cachedUser.data) {
+              set({ 
+                user: cachedUser.data as User,
+                isLoading: false
+              });
+              return;
+            }
+            } catch (error) {
+              console.log('No cached user data available');
+            }
+          }
           
           const response = await fetch('/api/auth/me', {
             headers: {
@@ -162,6 +200,9 @@ const useAuthStore = create<AuthStore>()(
           const data = await response.json();
           
           if (data.success && data.data) {
+            // Cache user data for offline use
+            await indexedDBManager.store('userData', data.data, Date.now());
+            
             set({ 
               user: data.data,
               isLoading: false
@@ -171,11 +212,112 @@ const useAuthStore = create<AuthStore>()(
           }
         } catch (error) {
           console.error('Refresh user error:', error);
+          
+          // If offline and we have cached data, use it
+          if (!navigator.onLine) {
+            try {
+              const cachedUser = await indexedDBManager.get('userData', 'currentUser');
+              if (cachedUser && cachedUser.data && typeof cachedUser.data === 'object' && 'email' in cachedUser.data) {
+                set({ 
+                  user: cachedUser.data as User,
+                  isLoading: false
+                });
+                return;
+              }
+            } catch (cacheError) {
+              console.log('No cached user data available');
+            }
+          }
+          
           set({ 
             error: error instanceof Error ? error.message : 'Failed to refresh user data',
             isLoading: false
           });
         }
+      },
+
+      // Offline management actions
+      setOnlineStatus: (isOnline: boolean) => {
+        set((state) => ({
+          offline: {
+            ...state.offline,
+            isOnline
+          }
+        }));
+        
+        // If back online, sync data
+        if (isOnline) {
+          get().syncOfflineData();
+        }
+      },
+
+      updateQueuedRequests: async () => {
+        try {
+          const status = await offlineQueue.getStatus();
+          set((state) => ({
+            offline: {
+              ...state.offline,
+              queuedRequests: status.total
+            }
+          }));
+        } catch (error) {
+          console.error('Failed to update queued requests count:', error);
+        }
+      },
+
+      syncOfflineData: async () => {
+        const { offline } = get();
+        
+        if (!offline.isOnline || offline.syncInProgress) {
+          return;
+        }
+
+        try {
+          set((state) => ({
+            offline: {
+              ...state.offline,
+              syncInProgress: true
+            }
+          }));
+
+          // Process offline queue
+          await offlineQueue.processQueue();
+          
+          // Update queue count
+          await get().updateQueuedRequests();
+          
+          set((state) => ({
+            offline: {
+              ...state.offline,
+              syncInProgress: false,
+              lastSyncTime: Date.now()
+            }
+          }));
+          
+          console.log('Offline data sync completed');
+        } catch (error) {
+          console.error('Failed to sync offline data:', error);
+          set((state) => ({
+            offline: {
+              ...state.offline,
+              syncInProgress: false
+            }
+          }));
+        }
+      },
+
+      clearOfflineQueue: async () => {
+        try {
+          await offlineQueue.clearQueue();
+          await get().updateQueuedRequests();
+          console.log('Offline queue cleared');
+        } catch (error) {
+          console.error('Failed to clear offline queue:', error);
+        }
+      },
+
+      getOfflineStatus: () => {
+        return get().offline;
       }
     }),
     {
